@@ -1,0 +1,26 @@
+{
+ "content": null,
+ "creation": "2025-09-15 12:48:50.290282",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2025-09-15 13:38:34.762702",
+ "modified_by": "Administrator",
+ "module": "Hospitality",
+ "name": "restaurant-order-ent",
+ "owner": "Administrator",
+ "page_name": "restaurant-order-ent",
+ "roles": [
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "Sales User"
+  }
+ ],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 0,
+ "title": "Restaurant Order Entry"
+}

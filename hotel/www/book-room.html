@@ -1,0 +1,222 @@
+
+<div class="x-app">
+  <header class="x-top">
+    <div class="brand">StayEasy</div>
+    <nav><a href="/">Home</a><a class="active" href="/book-room">Book</a><a href="/contact">Contact</a></nav>
+  </header>
+
+  <section class="x-filter">
+    <div class="row">
+      <div class="col">
+        <label>Guests / Qty</label>
+        <input id="qty" type="number" min="1" value="1"/>
+      </div>
+      <div class="col">
+        <label>Check-in</label>
+        <input id="from" type="date"/>
+      </div>
+      <div class="col">
+        <label>Check-out</label>
+        <input id="to" type="date"/>
+      </div>
+      <div class="col a-end">
+        <button class="btn primary" onclick="search()">Search</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="x-body">
+    <aside class="x-side">
+      <div class="card">
+        <h4>Filters</h4>
+        <div class="chipbox">
+          <label><input type="checkbox" id="f_available" checked/> Show available only</label>
+        </div>
+        <div class="chipbox">
+          <label><input type="checkbox" id="f_priced" checked/> Hide unpriced</label>
+        </div>
+      </div>
+      <div class="card tips">
+        <b>Tip</b>
+        <p>Pick dates first. We’ll compute nightly price and availability day-by-day.</p>
+      </div>
+    </aside>
+
+    <div class="x-results" id="results">
+      <!-- cards -->
+    </div>
+  </section>
+
+  <div class="x-modal" id="modal" style="display:none">
+    <div class="x-modal-card">
+      <div class="x-modal-head">
+        <div class="title" id="md_title">Confirm booking</div>
+        <button class="btn" onclick="closeModal()">✕</button>
+      </div>
+      <div id="md_summary" class="md-summary"></div>
+      <div class="row">
+        <div class="col"><input id="md_name" placeholder="Full name"/></div>
+        <div class="col"><input id="md_email" placeholder="Email (optional)"/></div>
+      </div>
+      <div class="row">
+        <div class="col"><input id="md_phone" placeholder="Phone (optional)"/></div>
+        <div class="col a-end"><button class="btn primary" onclick="confirmBooking()">Confirm</button></div>
+      </div>
+      <div id="md_msg" class="md-msg"></div>
+    </div>
+  </div>
+</div>
+
+<style>
+:root{--bg:#f6f7fb;--card:#fff;--ink:#0f172a;--muted:#64748b;--accent:#2563eb;--ring:#dbe3f3}
+body{background:var(--bg);color:var(--ink)}
+.x-app{max-width:1200px;margin:0 auto;padding:24px}
+.x-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.brand{font-weight:800;font-size:22px}
+.x-top nav a{margin-left:14px;color:var(--muted);text-decoration:none}
+.x-top nav a.active{color:var(--ink)}
+.x-filter{background:var(--card);border:1px solid var(--ring);border-radius:18px;padding:16px;box-shadow:0 12px 30px rgba(15,23,42,.06)}
+.row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.col label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}
+.col input{width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:10px}
+.col.a-end{display:flex;align-items:flex-end}
+.btn{border:0;border-radius:10px;background:#111827;color:#fff;padding:10px 14px;cursor:pointer}
+.btn.primary{background:var(--accent)}
+.x-body{display:grid;grid-template-columns:300px 1fr;gap:16px;margin-top:16px}
+.card{background:var(--card);border:1px solid var(--ring);border-radius:14px;padding:14px}
+.tips p{color:var(--muted);font-size:13px;margin:6px 0 0}
+.chipbox{margin-top:8px}
+.x-results{display:grid;grid-template-columns:1fr;gap:12px}
+.r-card{display:flex;gap:14px;background:var(--card);border:1px solid var(--ring);border-radius:14px;overflow:hidden}
+.r-ph{width:240px;height:160px;background:#e5e7eb}
+.r-ph img{width:100%;height:100%;object-fit:cover}
+.r-body{padding:12px;display:flex;flex-direction:column;gap:6px;flex:1}
+.r-title{font-weight:700}
+.r-sub{color:var(--muted);font-size:12px}
+.r-amen{display:flex;flex-wrap:wrap;gap:6px}
+.r-amen .chip{background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;padding:4px 8px;font-size:12px;color:#334155}
+.r-foot{display:flex;justify-content:space-between;align-items:flex-end;margin-top:auto}
+.price{font-size:18px}
+.badge{padding:4px 8px;border-radius:8px;font-size:12px}
+.badge.ok{background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0}
+.badge.no{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+.x-modal{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;padding:16px;z-index:100}
+.x-modal-card{background:#fff;border-radius:16px;max-width:720px;width:100%;padding:16px;border:1px solid var(--ring)}
+.x-modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.md-summary{color:#334155;background:#f8fafc;border:1px dashed var(--ring);border-radius:10px;padding:10px;margin-bottom:8px}
+.md-msg{margin-top:8px;color:#334155}
+@media(max-width:980px){.x-body{grid-template-columns:1fr}.row{grid-template-columns:1fr 1fr}.r-card{flex-direction:column}.r-ph{width:100%;height:180px}}
+</style>
+
+<script>
+let LAST_SEARCH = null;
+let SELECTED = null;
+
+function today(n=0){
+  const d = new Date(); d.setDate(d.getDate()+n);
+  return d.toISOString().slice(0,10);
+}
+
+async function search(){
+  const from = document.getElementById("from").value;
+  const to   = document.getElementById("to").value;
+  const qty  = document.getElementById("qty").value || 1;
+  const onlyAvail = document.getElementById("f_available").checked;
+  const hideUnpriced = document.getElementById("f_priced").checked;
+
+  const res = document.getElementById("results");
+  res.innerHTML = "<div class='card'>Searching…</div>";
+
+  try{
+    const r = await frappe.call({ method:"public_hotel_search", args:{ from_date:from, to_date:to, qty:qty }});
+    const m = r.message || {};
+    if(!(m.ok)){ res.innerHTML = "<div class='card'>No results for these dates.</div>"; return; }
+    let rows = m.results || [];
+    if(onlyAvail){ rows = rows.filter(x=>x.available); }
+    if(hideUnpriced){ rows = rows.filter(x=>x.priced); }
+    renderResults(rows, {from,to});
+    LAST_SEARCH = {from,to,qty};
+  }catch(e){
+    console.error(e);
+    res.innerHTML = "<div class='card'>Error loading results.</div>";
+  }
+}
+
+function renderResults(rows, ctx){
+  const res = document.getElementById("results");
+  res.innerHTML = "";
+  if(!rows.length){
+    res.innerHTML = "<div class='card'>No rooms match your filters.</div>";
+    return;
+  }
+  rows.forEach(r=>{
+    const card = document.createElement("div"); card.className="r-card";
+    const ph = document.createElement("div"); ph.className="r-ph";
+    ph.innerHTML = r.image ? `<img src='${r.image}'/>` : "";
+    const body = document.createElement("div"); body.className="r-body";
+    const t = document.createElement("div"); t.className="r-title";
+    t.innerText = r.name + (r.room_type ? (" • " + r.room_type) : "");
+    const sub = document.createElement("div"); sub.className="r-sub";
+    sub.innerText = `Capacity: ${r.capacity}${r.extra_bed_capacity?(" +"+r.extra_bed_capacity+" extra"):""}`;
+    const amen = document.createElement("div"); amen.className="r-amen";
+    (r.amenities||[]).slice(0,8).forEach(a=>{
+      const c = document.createElement("div"); c.className="chip"; c.innerText = a.item;
+      amen.appendChild(c);
+    });
+    const foot = document.createElement("div"); foot.className="r-foot";
+    const left = document.createElement("div");
+    left.innerHTML = r.priced
+      ? `<div class='price'><b>${r.avg_nightly.toFixed(2)}</b> / night &nbsp; • &nbsp; Total <b>${r.net_total.toFixed(2)}</b></div>`
+      : "<div class='price'>Not priced for these dates</div>";
+    const right = document.createElement("div");
+    const badge = document.createElement("span"); badge.className="badge " + (r.available?"ok":"no");
+    badge.innerText = r.available ? "Available" : "Unavailable";
+    const btn = document.createElement("button"); btn.className="btn"; btn.innerText="Book now";
+    btn.onclick = ()=>{
+      if(!(r.priced && r.available)){ frappe.msgprint("This option cannot be booked for the selected dates."); return; }
+      SELECTED = { pkg:r.name, from:ctx.from, to:ctx.to, qty:r.qty, total:r.net_total, nights:r.nights };
+      openModal(r);
+    };
+    right.appendChild(badge); right.appendChild(document.createTextNode(" ")); right.appendChild(btn);
+    foot.appendChild(left); foot.appendChild(right);
+
+    body.appendChild(t); body.appendChild(sub); body.appendChild(amen); body.appendChild(foot);
+    card.appendChild(ph); card.appendChild(body); res.appendChild(card);
+  });
+}
+
+function openModal(row){
+  document.getElementById("md_title").innerText = "Confirm booking";
+  document.getElementById("md_summary").innerHTML =
+    `<div><b>Package:</b> ${row.name}</div>
+     <div><b>Dates:</b> ${SELECTED.from} → ${SELECTED.to} (${SELECTED.nights} nights)</div>
+     <div style='margin-top:6px'><b>Total:</b> ${SELECTED.total.toFixed(2)}</div>`;
+  document.getElementById("md_msg").innerText = "";
+  document.getElementById("modal").style.display = "flex";
+}
+function closeModal(){ document.getElementById("modal").style.display = "none"; }
+
+async function confirmBooking(){
+  const name  = document.getElementById("md_name").value;
+  const email = document.getElementById("md_email").value;
+  const phone = document.getElementById("md_phone").value;
+  if(!name){ frappe.msgprint("Please enter your full name."); return; }
+  const msg = document.getElementById("md_msg"); msg.innerText = "Submitting…";
+  try{
+    const r = await frappe.call({
+      method:"public_hotel_place_booking",
+      args:{ guest_name:name, email:email, phone:phone,
+             hotel_room_package:SELECTED.pkg, from_date:SELECTED.from, to_date:SELECTED.to, qty:SELECTED.qty }
+    });
+    const m = r.message || {};
+    if(m.ok){ msg.innerHTML = `✅ Confirmed. Reference: <b>${m.reservation}</b>`; }
+    else{ msg.innerText = "Failed: " + (m.reason||"unknown"); }
+  }catch(e){ console.error(e); msg.innerText = "Error while booking."; }
+}
+
+frappe.ready(()=>{
+  const f = document.getElementById("from"), t = document.getElementById("to");
+  f.value = today(1); t.value = today(2);
+  search();
+});
+</script>
