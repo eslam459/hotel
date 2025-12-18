@@ -9,7 +9,7 @@ The `get_oauth_config` endpoint allows guest access for retrieving site-specific
 import frappe
 import os
 from frappe import _
-from frappe.utils import today, getdate, nowdate, cint, strip_html
+from frappe.utils import today, getdate, nowdate, cint, strip_html, add_days
 from frappe.desk.form.assign_to import add as assign_task, remove as unassign_task
 
 
@@ -1543,13 +1543,17 @@ def home_tasks(limit=5):
 		{"today": [tasks...], "limit": N}
 	"""
 	today_date = today()
+	tomorrow_date = add_days(today_date, 1)
 	
 	# Get task names first (lightweight query)
+	# NOTE: Using start_date (not due_date) to filter today's tasks
+	# start_date is Datetime field, so we need to use range filter
 	task_names = frappe.get_all(
 		"CRM Task",
-		filters={
-			"start_date": today_date
-		},
+		filters=[
+			["start_date", ">=", f"{today_date} 00:00:00"],
+			["start_date", "<", f"{tomorrow_date} 00:00:00"]
+		],
 		fields=["name"],
 		order_by="priority desc, modified desc",
 		page_length=cint(limit) or 5
@@ -1590,6 +1594,7 @@ def main_page_buckets(min_each=5):
 		}
 	"""
 	today_date = today()
+	tomorrow_date = add_days(today_date, 1)
 	min_count = cint(min_each) or 5
 	
 	# Active statuses (not Done or Canceled)
@@ -1615,26 +1620,30 @@ def main_page_buckets(min_each=5):
 				continue
 		return tasks
 	
-	# Today's tasks
+	# Today's tasks - using start_date (not due_date)
+	# start_date is Datetime field, so we need to use range filter
 	today_tasks = get_tasks_with_all_fields(
-		filters={"start_date": today_date},
+		filters=[
+			["start_date", ">=", f"{today_date} 00:00:00"],
+			["start_date", "<", f"{tomorrow_date} 00:00:00"]
+		],
 		order_by="priority desc, modified desc",
 		page_length=min_count
 	)
 	
-	# Late tasks (before today and still active)
+	# Late tasks (before today and still active) - using start_date (not due_date)
 	late_tasks = get_tasks_with_all_fields(
-		filters={
-			"start_date": ["<", today_date],
-			"status": ["in", active_statuses]
-		},
+		filters=[
+			["start_date", "<", f"{today_date} 00:00:00"],
+			["status", "in", active_statuses]
+		],
 		order_by="start_date asc, priority desc",
 		page_length=min_count
 	)
 	
-	# Upcoming tasks (after today)
+	# Upcoming tasks (after today) - using start_date (not due_date)
 	upcoming_tasks = get_tasks_with_all_fields(
-		filters={"start_date": [">", today_date]},
+		filters=[["start_date", ">=", f"{tomorrow_date} 00:00:00"]],
 		order_by="start_date asc, priority desc",
 		page_length=min_count
 	)
