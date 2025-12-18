@@ -3764,6 +3764,187 @@ def home_leads(limit=5):
 			frappe.log_error(f"Error loading lead {lead_name}: {str(e)}", "home_leads_error")
 			continue
 	
+	# Get all comments and last comment for each lead
+	if data:
+		try:
+			lead_names = [lead.get("name") for lead in data if lead.get("name")]
+			if lead_names:
+				# Get all comments for each lead (with all available fields)
+				all_comments = frappe.get_all(
+					"Comment",
+					filters=[
+						["reference_doctype", "=", "CRM Lead"],
+						["reference_name", "in", lead_names],
+						["comment_type", "=", "Comment"]
+					],
+					fields=["name", "reference_name", "reference_doctype", "reference_owner",
+					        "comment_type", "comment_email", "comment_by", "subject",
+					        "content", "creation", "modified", "published", "seen",
+					        "delayed", "ip_address"],
+					order_by="creation desc"
+				)
+				
+				# Create dictionaries mapping lead_name to comments
+				last_comments = {}  # Last comment only
+				all_comments_dict = {}  # All comments grouped by lead
+				
+				for comment in all_comments:
+					lead_name = comment.get("reference_name")
+					if lead_name:
+						# Format comment data with all fields
+						comment_data = {
+							"name": comment.get("name"),
+							"reference_name": comment.get("reference_name"),
+							"reference_doctype": comment.get("reference_doctype"),
+							"reference_owner": comment.get("reference_owner"),
+							"comment_type": comment.get("comment_type"),
+							"comment_email": comment.get("comment_email"),
+							"comment_by": comment.get("comment_by"),
+							"subject": comment.get("subject"),
+							"content": comment.get("content"),
+							"creation": comment.get("creation"),
+							"modified": comment.get("modified"),
+							"published": comment.get("published"),
+							"seen": comment.get("seen"),
+							"delayed": comment.get("delayed"),
+							"ip_address": comment.get("ip_address")
+						}
+						
+						# Store last comment (first one encountered is the most recent due to order_by)
+						if lead_name not in last_comments:
+							last_comments[lead_name] = comment_data
+						
+						# Store all comments
+						if lead_name not in all_comments_dict:
+							all_comments_dict[lead_name] = []
+						all_comments_dict[lead_name].append(comment_data)
+				
+				# Add last_comment and comments to each lead in data
+				for lead in data:
+					lead_name = lead.get("name")
+					# Always add comments fields, even if lead_name is None
+					if lead_name and lead_name in last_comments:
+						lead["last_comment"] = last_comments[lead_name]
+					else:
+						lead["last_comment"] = None
+					
+					if lead_name and lead_name in all_comments_dict:
+						# Sort comments by creation desc (newest first)
+						lead["comments"] = sorted(
+							all_comments_dict[lead_name],
+							key=lambda x: x.get("creation", ""),
+							reverse=True
+						)
+					else:
+						lead["comments"] = []
+		except Exception as e:
+			frappe.log_error(f"Error fetching comments: {str(e)}", "home_leads_comments_error")
+			# If error occurs, set last_comment and comments to None/empty for all leads
+			for lead in data:
+				lead["last_comment"] = None
+				lead["comments"] = []
+	
+	# Add Table fields (child tables) for each lead
+	if data:
+		try:
+			lead_names = [lead.get("name") for lead in data if lead.get("name")]
+			if lead_names:
+				# Get duplicate_leads table data
+				duplicate_leads_data = frappe.get_all(
+					"Duplicate Lead Entry",
+					filters=[["parent", "in", lead_names]],
+					fields=["parent", "name", "lead", "lead_name", "email", "mobile_no"],
+					order_by="parent, idx"
+				)
+				duplicate_leads_dict = {}
+				for row in duplicate_leads_data:
+					parent = row.get("parent")
+					if parent not in duplicate_leads_dict:
+						duplicate_leads_dict[parent] = []
+					duplicate_leads_dict[parent].append({
+						"name": row.get("name"),
+						"lead": row.get("lead"),
+						"lead_name": row.get("lead_name"),
+						"email": row.get("email"),
+						"mobile_no": row.get("mobile_no")
+					})
+				
+				# Get status_change_log table data
+				status_change_log_data = frappe.get_all(
+					"CRM Status Change Log",
+					filters=[["parent", "in", lead_names]],
+					fields=["parent", "name", "from_status", "to_status", "changed_by", "changed_on", "reason"],
+					order_by="parent, idx"
+				)
+				status_change_log_dict = {}
+				for row in status_change_log_data:
+					parent = row.get("parent")
+					if parent not in status_change_log_dict:
+						status_change_log_dict[parent] = []
+					status_change_log_dict[parent].append({
+						"name": row.get("name"),
+						"from_status": row.get("from_status"),
+						"to_status": row.get("to_status"),
+						"changed_by": row.get("changed_by"),
+						"changed_on": row.get("changed_on"),
+						"reason": row.get("reason")
+					})
+				
+				# Get property_preference_details table data
+				property_preference_data = frappe.get_all(
+					"Property Preference",
+					filters=[["parent", "in", lead_names]],
+					fields=["parent", "name", "*"],
+					order_by="parent, idx"
+				)
+				property_preference_dict = {}
+				for row in property_preference_data:
+					parent = row.get("parent")
+					if parent not in property_preference_dict:
+						property_preference_dict[parent] = []
+					# Remove parent and doctype from row data
+					row_data = {k: v for k, v in row.items() if k not in ["parent", "doctype"]}
+					property_preference_dict[parent].append(row_data)
+				
+				# Get products table data
+				products_data = frappe.get_all(
+					"CRM Products",
+					filters=[["parent", "in", lead_names]],
+					fields=["parent", "name", "*"],
+					order_by="parent, idx"
+				)
+				products_dict = {}
+				for row in products_data:
+					parent = row.get("parent")
+					if parent not in products_dict:
+						products_dict[parent] = []
+					# Remove parent and doctype from row data
+					row_data = {k: v for k, v in row.items() if k not in ["parent", "doctype"]}
+					products_dict[parent].append(row_data)
+				
+				# Add table fields to each lead
+				for lead in data:
+					lead_name = lead.get("name")
+					if lead_name:  # Only process if lead_name is not None
+						lead["duplicate_leads"] = duplicate_leads_dict.get(lead_name, [])
+						lead["status_change_log"] = status_change_log_dict.get(lead_name, [])
+						lead["property_preference_details"] = property_preference_dict.get(lead_name, [])
+						lead["products"] = products_dict.get(lead_name, [])
+					else:
+						# If lead_name is None, set empty arrays
+						lead["duplicate_leads"] = []
+						lead["status_change_log"] = []
+						lead["property_preference_details"] = []
+						lead["products"] = []
+		except Exception as e:
+			frappe.log_error(f"Error fetching table fields: {str(e)}", "home_leads_table_fields_error")
+			# If error occurs, set table fields to empty arrays for all leads
+			for lead in data:
+				lead["duplicate_leads"] = []
+				lead["status_change_log"] = []
+				lead["property_preference_details"] = []
+				lead["products"] = []
+	
 	return {
 		"today": data,
 		"limit": cint(limit) or 5
