@@ -268,6 +268,63 @@ def get_compact_task(task, return_all_fields=False):
 		# Error getting assigned users, return empty array
 		result["assigned_to"] = []
 	
+	# Expand link fields to return names instead of IDs
+	# Lead field - return lead_name instead of ID
+	lead_id = _get(result, "lead")
+	if lead_id:
+		try:
+			lead_doc = frappe.get_doc("CRM Lead", lead_id)
+			lead_name = lead_doc.get("lead_name") or lead_doc.get("organization") or lead_doc.get("email") or lead_id
+			result["lead"] = lead_name
+			result["lead_id"] = lead_id
+		except Exception:
+			result["lead_id"] = lead_id
+	
+	# Reference DocName (Lead) - return lead name
+	reference_docname = _get(result, "reference_docname")
+	reference_doctype = _get(result, "reference_doctype")
+	if reference_docname and reference_doctype == "CRM Lead":
+		try:
+			lead_doc = frappe.get_doc("CRM Lead", reference_docname)
+			lead_name = lead_doc.get("lead_name") or lead_doc.get("organization") or lead_doc.get("email") or reference_docname
+			result["reference_docname"] = lead_name
+			result["reference_docname_id"] = reference_docname
+		except Exception:
+			result["reference_docname_id"] = reference_docname
+	
+	# Project field - return project_name instead of ID
+	project_id = _get(result, "project")
+	if project_id:
+		try:
+			project_doc = frappe.get_doc("Real Estate Project", project_id)
+			project_name = project_doc.get("project_name") or project_id
+			result["project"] = project_name
+			result["project_id"] = project_id
+		except Exception:
+			result["project_id"] = project_id
+	
+	# Unit field - return unit_name instead of ID
+	unit_id = _get(result, "unit")
+	if unit_id:
+		try:
+			unit_doc = frappe.get_doc("Unit", unit_id)
+			unit_name = unit_doc.get("unit_name") or unit_doc.get("name") or unit_id
+			result["unit"] = unit_name
+			result["unit_id"] = unit_id
+		except Exception:
+			result["unit_id"] = unit_id
+	
+	# Project Unit field - return unit_name instead of ID
+	project_unit_id = _get(result, "project_unit")
+	if project_unit_id:
+		try:
+			project_unit_doc = frappe.get_doc("Project Unit", project_unit_id)
+			project_unit_name = project_unit_doc.get("unit_name") or project_unit_doc.get("name") or project_unit_id
+			result["project_unit"] = project_unit_name
+			result["project_unit_id"] = project_unit_id
+		except Exception:
+			result["project_unit_id"] = project_unit_id
+	
 	return result
 
 
@@ -2928,9 +2985,12 @@ def get_all_leads(page=1, limit=20, order_by="modified desc",
 				  lead_owner=None, assigned_to=None,
 				  project=None, project_unit=None, single_unit=None,
 				  territory=None, campaign=None,
-				  converted=None, assigned_date=None,
+				  converted=None, delayed=None, assigned_date=None,
 				  creation_from=None, creation_to=None,
 				  modified_from=None, modified_to=None,
+				  budget_from=None, budget_to=None,
+				  space_from=None, space_to=None,
+				  best_time_contacte_from=None, best_time_contacte_to=None,
 				  **kwargs):
 	"""
 	Get all CRM Leads with pagination and filtering on all fields.
@@ -2963,11 +3023,18 @@ def get_all_leads(page=1, limit=20, order_by="modified desc",
 		territory: Territory name or ID
 		campaign: Campaign name or ID
 		converted: Converted filter (0 or 1)
+		delayed: Delayed filter (0 or 1)
 		assigned_date: Assigned date filter (YYYY-MM-DD)
 		creation_from: Creation date filter from (YYYY-MM-DD or DD-MM-YYYY)
 		creation_to: Creation date filter to (YYYY-MM-DD or DD-MM-YYYY)
 		modified_from: Modified date filter from (YYYY-MM-DD or DD-MM-YYYY)
 		modified_to: Modified date filter to (YYYY-MM-DD or DD-MM-YYYY)
+		budget_from: Budget filter from (minimum value)
+		budget_to: Budget filter to (maximum value)
+		space_from: Space filter from (minimum value in square meters)
+		space_to: Space filter to (maximum value in square meters)
+		best_time_contacte_from: Best time to contact filter from (HH:MM:SS format, hours only)
+		best_time_contacte_to: Best time to contact filter to (HH:MM:SS format, hours only)
 	
 	Returns:
 		{
@@ -3006,11 +3073,18 @@ def get_all_leads(page=1, limit=20, order_by="modified desc",
 		territory = frappe.form_dict.get('territory') if 'territory' in frappe.form_dict else territory
 		campaign = frappe.form_dict.get('campaign') if 'campaign' in frappe.form_dict else campaign
 		converted = frappe.form_dict.get('converted') if 'converted' in frappe.form_dict else converted
+		delayed = frappe.form_dict.get('delayed') if 'delayed' in frappe.form_dict else delayed
 		assigned_date = frappe.form_dict.get('assigned_date') if 'assigned_date' in frappe.form_dict else assigned_date
 		creation_from = frappe.form_dict.get('creation_from') if 'creation_from' in frappe.form_dict else creation_from
 		creation_to = frappe.form_dict.get('creation_to') if 'creation_to' in frappe.form_dict else creation_to
 		modified_from = frappe.form_dict.get('modified_from') if 'modified_from' in frappe.form_dict else modified_from
 		modified_to = frappe.form_dict.get('modified_to') if 'modified_to' in frappe.form_dict else modified_to
+		budget_from = frappe.form_dict.get('budget_from') if 'budget_from' in frappe.form_dict else budget_from
+		budget_to = frappe.form_dict.get('budget_to') if 'budget_to' in frappe.form_dict else budget_to
+		space_from = frappe.form_dict.get('space_from') if 'space_from' in frappe.form_dict else space_from
+		space_to = frappe.form_dict.get('space_to') if 'space_to' in frappe.form_dict else space_to
+		best_time_contacte_from = frappe.form_dict.get('best_time_contacte_from') if 'best_time_contacte_from' in frappe.form_dict else best_time_contacte_from
+		best_time_contacte_to = frappe.form_dict.get('best_time_contacte_to') if 'best_time_contacte_to' in frappe.form_dict else best_time_contacte_to
 		page = frappe.form_dict.get('page') if 'page' in frappe.form_dict else page
 		limit = frappe.form_dict.get('limit') if 'limit' in frappe.form_dict else limit
 		order_by = frappe.form_dict.get('order_by') if 'order_by' in frappe.form_dict else order_by
@@ -3137,6 +3211,11 @@ def get_all_leads(page=1, limit=20, order_by="modified desc",
 		converted_val = cint(converted)
 		filters.append(["converted", "=", converted_val])
 	
+	# Delayed filter
+	if delayed is not None:
+		delayed_val = cint(delayed)
+		filters.append(["delayed", "=", delayed_val])
+	
 	# Assigned date filter
 	if assigned_date and str(assigned_date).strip():
 		filters.append(["assigned_date", "=", assigned_date])
@@ -3197,6 +3276,69 @@ def get_all_leads(page=1, limit=20, order_by="modified desc",
 				filters.append(["modified", "<=", f"{modified_to} 23:59:59"])
 			else:
 				filters.append(["modified", "<=", modified_to])
+	
+	# Budget range filters
+	if budget_from is not None and str(budget_from).strip():
+		try:
+			budget_from_val = float(budget_from)
+			filters.append(["budget", ">=", budget_from_val])
+		except (ValueError, TypeError):
+			pass
+	if budget_to is not None and str(budget_to).strip():
+		try:
+			budget_to_val = float(budget_to)
+			filters.append(["budget", "<=", budget_to_val])
+		except (ValueError, TypeError):
+			pass
+	
+	# Space range filters
+	if space_from is not None and str(space_from).strip():
+		try:
+			space_from_val = float(space_from)
+			filters.append(["space", ">=", space_from_val])
+		except (ValueError, TypeError):
+			pass
+	if space_to is not None and str(space_to).strip():
+		try:
+			space_to_val = float(space_to)
+			filters.append(["space", "<=", space_to_val])
+		except (ValueError, TypeError):
+			pass
+	
+	# Best time to contact range filters (hours only)
+	# best_time_contacte is stored as "HH:MM:SS" format
+	if best_time_contacte_from and str(best_time_contacte_from).strip():
+		time_from = str(best_time_contacte_from).strip()
+		# Normalize time format: if only hours provided (e.g., "09"), convert to "09:00:00"
+		if ":" not in time_from:
+			try:
+				hour = int(time_from)
+				if 0 <= hour <= 23:
+					time_from = f"{hour:02d}:00:00"
+			except ValueError:
+				pass
+		# If format is "HH:MM", convert to "HH:MM:00"
+		elif time_from.count(":") == 1:
+			time_from = f"{time_from}:00"
+		# Ensure format is "HH:MM:SS"
+		if len(time_from) == 8 and time_from.count(":") == 2:
+			filters.append(["best_time_contacte", ">=", time_from])
+	if best_time_contacte_to and str(best_time_contacte_to).strip():
+		time_to = str(best_time_contacte_to).strip()
+		# Normalize time format: if only hours provided (e.g., "17"), convert to "17:59:59"
+		if ":" not in time_to:
+			try:
+				hour = int(time_to)
+				if 0 <= hour <= 23:
+					time_to = f"{hour:02d}:59:59"
+			except ValueError:
+				pass
+		# If format is "HH:MM", convert to "HH:MM:59"
+		elif time_to.count(":") == 1:
+			time_to = f"{time_to}:59"
+		# Ensure format is "HH:MM:SS"
+		if len(time_to) == 8 and time_to.count(":") == 2:
+			filters.append(["best_time_contacte", "<=", time_to])
 	
 	# Get total count with filters
 	total = frappe.db.count("CRM Lead", filters=filters if filters else None)
